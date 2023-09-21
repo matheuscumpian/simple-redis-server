@@ -117,7 +117,7 @@ func main() {
 }
 
 func HandleRedisCommand(message string) []byte {
-	command := strings.TrimSuffix(message, "\r\n")
+	command := strings.ToUpper(strings.TrimSuffix(message, "\r\n"))
 	switch command {
 	case "PING":
 		return []byte("+PONG\r\n")
