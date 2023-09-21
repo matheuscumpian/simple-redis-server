@@ -1,14 +1,15 @@
 package main
 
 import (
-	"log/slog"
+	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
 	"sync"
 )
 
-var logger = slog.Default()
+var logger = log.Default()
 
 type Message struct {
 	from    string
@@ -55,10 +56,10 @@ func (s *Server) acceptLoop() {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			logger.Error("Failed to accept connection", "error", err)
+			fmt.Println("Failed to accept connection", "error", err)
 		}
 
-		logger.Info("Accepted connection", "remote_addr", conn.RemoteAddr())
+		fmt.Println("Accepted connection", "remote_addr", conn.RemoteAddr())
 
 		go s.readConn(conn)
 	}
@@ -75,7 +76,7 @@ func (s *Server) readConn(conn net.Conn) {
 	for {
 		msgLen, err := conn.Read(buf)
 		if err != nil {
-			logger.Error("Failed to read from connection", "error", err)
+			fmt.Println("Failed to read from connection", "error", err)
 			return
 		}
 		msg := buf[:msgLen]
@@ -88,14 +89,14 @@ func (s *Server) readConn(conn net.Conn) {
 }
 
 func main() {
-	logger.Info("Starting Redis", "version", "0.0.1")
+	fmt.Println("Starting Redis", "version", "0.0.1")
 
 	server := NewServer("0.0.0.0:6379")
 
 	go func() {
 		for {
 			msg := <-server.msgChan
-			logger.Info("Received message", "message", string(msg.payload), "from", msg.from)
+			fmt.Println("Received message", "message", string(msg.payload), "from", msg.from)
 
 			server.RLock()
 			conn := server.peerMap[msg.from]
@@ -104,13 +105,13 @@ func main() {
 			response := HandleRedisCommand(string(msg.payload))
 
 			if _, err := conn.Write(response); err != nil {
-				logger.Error("Failed to write to connection", "error", err)
+				fmt.Println("Failed to write to connection", "error", err)
 			}
 		}
 	}()
 
 	if err := server.Start(); err != nil {
-		logger.Error("Failed to start server", "error", err)
+		fmt.Println("Failed to start server", "error", err)
 		os.Exit(1)
 	}
 }
