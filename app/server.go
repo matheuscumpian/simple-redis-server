@@ -118,10 +118,9 @@ func main() {
 
 func HandleRedisCommand(message string) []byte {
 	command := strings.ToUpper(strings.TrimSuffix(message, "\r\n"))
-	switch command {
-	case "PING":
+	if strings.Contains(command, "PING") {
 		return []byte("+PONG\r\n")
-	default:
-		return []byte("ERR unknown command '" + command + "'")
 	}
+
+	return []byte("-ERR unknown command '" + command + "'\r\n")
 }
