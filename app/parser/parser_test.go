@@ -24,7 +24,21 @@ func TestParser_Parse(t *testing.T) {
 			},
 			want: []Command{
 				Ping{
-					Literal: "ping",
+					Literal:  "ping",
+					Response: "+PONG\r\n",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "ping",
+			fields: fields{
+				input: "*1\r\n$4\r\nping\r\n$12\r\nhello world\r\n",
+			},
+			want: []Command{
+				Ping{
+					Literal:  "ping",
+					Response: "hello world\r\n",
 				},
 			},
 			wantErr: false,

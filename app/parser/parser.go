@@ -13,7 +13,8 @@ type Command interface {
 }
 
 type Ping struct {
-	Literal string
+	Literal  string
+	Response string
 }
 
 func (p Ping) String() string {
@@ -21,7 +22,7 @@ func (p Ping) String() string {
 }
 
 func (p Ping) Respond() string {
-	return "+PONG\r\n"
+	return p.Response
 }
 
 type Parser struct {
@@ -72,10 +73,40 @@ func (p *Parser) Parse() ([]Command, error) {
 func (p *Parser) getCommand(str string) (Command, error) {
 	switch strings.ToLower(str) {
 	case "ping":
-		return Ping{Literal: str}, nil
+		return p.parsePing(str)
 	}
 
 	return nil, nil
+}
+
+func (p *Parser) parsePing(str string) (Command, error) {
+	cmd := Ping{
+		Literal:  str,
+		Response: "+PONG\r\n",
+	}
+
+	if p.current() == '$' {
+		p.advance()
+
+		length, err := p.readLength()
+		if err != nil {
+			return nil, err
+		}
+
+		p.advance()
+
+		pingResponse := strings.Builder{}
+		for i := 0; i < length; i++ {
+			pingResponse.WriteByte(p.current())
+			p.advance()
+		}
+
+		pingResponse.WriteString("\r\n")
+
+		cmd.Response = pingResponse.String()
+	}
+
+	return cmd, nil
 }
 
 func (p *Parser) readCommand() (Command, error) {
@@ -90,7 +121,7 @@ func (p *Parser) readCommand() (Command, error) {
 		p.advance()
 
 		command := strings.Builder{}
-		for i := 0; i < int(length); i++ {
+		for i := 0; i < length; i++ {
 			command.WriteByte(p.current())
 			p.advance()
 		}
@@ -105,12 +136,32 @@ func (p *Parser) readCommand() (Command, error) {
 	return nil, errors.New("invalid command")
 }
 
+func (p *Parser) readLength() (int, error) {
+	str := strings.Builder{}
+	for p.current() != '\r' {
+		str.WriteByte(p.current())
+		p.advanceWithoutSkippingCRLF()
+	}
+
+	length, err := strconv.Atoi(str.String())
+	if err != nil {
+		return 0, fmt.Errorf("invalid length of command, received $%s, expeced $INTEGER", string(p.current()))
+	}
+
+	return length, nil
+}
+
 func (p *Parser) current() byte {
 	if p.currentPosition >= len(p.input) {
 		return 0
 	}
 
 	return p.input[p.currentPosition]
+}
+
+func (p *Parser) advanceWithoutSkippingCRLF() {
+	p.currentPosition = p.peekPosition
+	p.peekPosition++
 }
 
 func (p *Parser) advance() {

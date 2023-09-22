@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"redis/app/parser"
+	"strings"
 	"sync"
 )
 
@@ -123,27 +123,33 @@ func handlePayload(payload []byte) [][]byte {
 
 	var responses [][]byte
 
-	p := parser.NewParser(payloadStr)
-	cmds, err := p.Parse()
-	if err != nil {
-		responses = append(responses, []byte("-ERR "+err.Error()+"\r\n"))
-		return responses
-	}
-
-	if len(cmds) == 0 {
-		responses = append(responses, []byte("-ERR empty command\r\n"))
-		return responses
-	}
-
-	for _, cmd := range cmds {
-		if cmd == nil {
-			responses = append(responses, []byte("-ERR invalid command\r\n"))
-			continue
+	for _, cmd := range strings.Split(payloadStr, "\r\n") {
+		if strings.Contains(strings.ToLower(cmd), "ping") {
+			responses = append(responses, []byte("+PONG\r\n"))
 		}
-
-		response := cmd.Respond()
-		responses = append(responses, []byte(response))
 	}
+
+	//p := parser.NewParser(payloadStr)
+	//cmds, err := p.Parse()
+	//if err != nil {
+	//	responses = append(responses, []byte("-ERR "+err.Error()+"\r\n"))
+	//	return responses
+	//}
+	//
+	//if len(cmds) == 0 {
+	//	responses = append(responses, []byte("-ERR empty command\r\n"))
+	//	return responses
+	//}
+	//
+	//for _, cmd := range cmds {
+	//	if cmd == nil {
+	//		responses = append(responses, []byte("-ERR invalid command\r\n"))
+	//		continue
+	//	}
+	//
+	//	response := cmd.Respond()
+	//	responses = append(responses, []byte(response))
+	//}
 
 	return responses
 }
