@@ -36,7 +36,7 @@ func NewParser(input string) *Parser {
 }
 
 func (p *Parser) Parse() ([]Command, error) {
-	cmds := make([]Command, 0)
+	commands := make([]Command, 0)
 	for p.current() != 0 {
 		p.advance()
 		if p.current() == '*' {
@@ -55,7 +55,7 @@ func (p *Parser) Parse() ([]Command, error) {
 					return nil, err
 				}
 
-				cmds = append(cmds, cmd)
+				commands = append(commands, cmd)
 			}
 		} else if p.current() == '$' {
 			cmd, err := p.readCommand()
@@ -63,11 +63,11 @@ func (p *Parser) Parse() ([]Command, error) {
 				return nil, err
 			}
 
-			cmds = append(cmds, cmd)
+			commands = append(commands, cmd)
 		}
 	}
 
-	return cmds, nil
+	return commands, nil
 }
 
 func (p *Parser) getCommand(str string) (Command, error) {
