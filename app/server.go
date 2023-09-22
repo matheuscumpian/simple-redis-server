@@ -2,14 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
-	"strings"
+	"redis/app/parser"
 	"sync"
 )
-
-var logger = log.Default()
 
 type Message struct {
 	from    string
@@ -93,22 +90,7 @@ func main() {
 
 	server := NewServer("0.0.0.0:6379")
 
-	go func() {
-		for {
-			msg := <-server.msgChan
-			fmt.Println("Received message", "message", string(msg.payload), "from", msg.from)
-
-			server.RLock()
-			conn := server.peerMap[msg.from]
-			server.RUnlock()
-
-			response := HandleRedisCommand(string(msg.payload))
-
-			if _, err := conn.Write(response); err != nil {
-				fmt.Println("Failed to write to connection", "error", err)
-			}
-		}
-	}()
+	go commandHandlerLoop(server)
 
 	if err := server.Start(); err != nil {
 		fmt.Println("Failed to start server", "error", err)
@@ -116,11 +98,52 @@ func main() {
 	}
 }
 
-func HandleRedisCommand(message string) []byte {
-	command := strings.ToUpper(strings.TrimSuffix(message, "\r\n"))
-	if strings.Contains(command, "PING") {
-		return []byte("+PONG\r\n")
+func commandHandlerLoop(server *Server) {
+	for {
+		msg := <-server.msgChan
+		fmt.Println("Received message", "message", string(msg.payload), "from", msg.from)
+
+		server.RLock()
+		conn := server.peerMap[msg.from]
+		server.RUnlock()
+
+		responses := handlePayload(msg.payload)
+
+		for _, response := range responses {
+			if _, err := conn.Write(response); err != nil {
+				fmt.Println("Failed to write to connection", "error", err)
+			}
+		}
+
+	}
+}
+
+func handlePayload(payload []byte) [][]byte {
+	payloadStr := string(payload)
+
+	var responses [][]byte
+
+	p := parser.NewParser(payloadStr)
+	cmds, err := p.Parse()
+	if err != nil {
+		responses = append(responses, []byte("-ERR "+err.Error()+"\r\n"))
+		return responses
 	}
 
-	return []byte("-ERR unknown command '" + command + "'\r\n")
+	if len(cmds) == 0 {
+		responses = append(responses, []byte("-ERR empty command\r\n"))
+		return responses
+	}
+
+	for _, cmd := range cmds {
+		if cmd == nil {
+			responses = append(responses, []byte("-ERR invalid command\r\n"))
+			continue
+		}
+
+		response := cmd.Respond()
+		responses = append(responses, []byte(response))
+	}
+
+	return responses
 }
