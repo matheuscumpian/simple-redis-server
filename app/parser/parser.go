@@ -12,6 +12,7 @@ type Command interface {
 	Respond() string
 }
 
+// Ping command
 type Ping struct {
 	Literal  string
 	Response string
@@ -22,7 +23,33 @@ func (p Ping) String() string {
 }
 
 func (p Ping) Respond() string {
-	return p.Response
+	str := strings.Builder{}
+	str.WriteString("$")
+	str.WriteString(strconv.Itoa(len(p.Response)))
+	str.WriteString("\r\n")
+	str.WriteString(p.Response)
+	str.WriteString("\r\n")
+	return str.String()
+}
+
+// Echo command
+type Echo struct {
+	Literal  string
+	Response string
+}
+
+func (e Echo) String() string {
+	return "ECHO"
+}
+
+func (e Echo) Respond() string {
+	str := strings.Builder{}
+	str.WriteString("$")
+	str.WriteString(strconv.Itoa(len(e.Response)))
+	str.WriteString("\r\n")
+	str.WriteString(e.Response)
+	str.WriteString("\r\n")
+	return str.String()
 }
 
 type Parser struct {
@@ -39,32 +66,13 @@ func (p *Parser) Parse() ([]Command, error) {
 	commands := make([]Command, 0)
 	for p.current() != 0 {
 		p.advance()
-		if p.current() == '*' {
-			p.advance()
 
-			length, err := strconv.Atoi(string(p.current()))
-			if err != nil {
-				return nil, fmt.Errorf("invalid length of array, received *%s, expeced *INTEGER", string(p.current()))
-			}
-
-			p.advance()
-
-			for i := 0; i < length; i++ {
-				cmd, err := p.readCommand()
-				if err != nil {
-					return nil, err
-				}
-
-				commands = append(commands, cmd)
-			}
-		} else if p.current() == '$' {
-			cmd, err := p.readCommand()
-			if err != nil {
-				return nil, err
-			}
-
-			commands = append(commands, cmd)
+		cmd, err := p.readToken()
+		if err != nil {
+			return nil, err
 		}
+
+		commands = append(commands, cmd)
 	}
 
 	return commands, nil
@@ -74,73 +82,92 @@ func (p *Parser) getCommand(str string) (Command, error) {
 	switch strings.ToLower(str) {
 	case "ping":
 		return p.parsePing(str)
+	case "echo":
+		return p.parseEcho(str)
 	}
 
 	return nil, nil
 }
 
-func (p *Parser) parsePing(str string) (Command, error) {
-	cmd := Ping{
-		Literal:  str,
-		Response: "+PONG\r\n",
+func (p *Parser) parseEcho(str string) (Command, error) {
+	cmd := Echo{
+		Literal: str,
 	}
 
+	// Get argument if it exists
 	if p.current() == '$' {
-		p.advance()
-
-		length, err := p.readLength()
+		str, err := p.parseBulkString()
 		if err != nil {
 			return nil, err
 		}
 
-		p.advance()
-
-		pingResponse := strings.Builder{}
-		for i := 0; i < length; i++ {
-			pingResponse.WriteByte(p.current())
-			p.advance()
-		}
-
-		pingResponse.WriteString("\r\n")
-
-		cmd.Response = pingResponse.String()
+		cmd.Response = str
 	}
 
 	return cmd, nil
 }
 
-func (p *Parser) readCommand() (Command, error) {
+func (p *Parser) parsePing(str string) (Command, error) {
+	cmd := Ping{
+		Literal:  str,
+		Response: "PONG",
+	}
+
+	// Get argument if it exists
 	if p.current() == '$' {
-		p.advance()
-
-		length, err := strconv.Atoi(string(p.current()))
+		str, err := p.parseBulkString()
 		if err != nil {
-			return nil, fmt.Errorf("invalid length of command, received $%s, expeced $INTEGER", string(p.current()))
+			return nil, err
 		}
 
-		p.advance()
+		cmd.Response = str
+	}
 
-		command := strings.Builder{}
-		for i := 0; i < length; i++ {
-			command.WriteByte(p.current())
-			p.advance()
+	return cmd, nil
+}
+
+func (p *Parser) readToken() (Command, error) {
+	if p.current() == '$' {
+		str, err := p.parseBulkString()
+		if err != nil {
+			return nil, err
 		}
 
-		cmd, err := p.getCommand(command.String())
+		cmd, err := p.getCommand(str)
 		if err != nil {
 			return nil, err
 		}
 
 		return cmd, nil
 	}
+
 	return nil, errors.New("invalid command")
 }
 
-func (p *Parser) readLength() (int, error) {
+func (p *Parser) parseBulkString() (string, error) {
+	p.advance()
+
+	length, err := p.readSize()
+	if err != nil {
+		return "", err
+	}
+
+	p.advance()
+
+	str := strings.Builder{}
+	for i := 0; i < length; i++ {
+		str.WriteByte(p.current())
+		p.advance()
+	}
+
+	return str.String(), nil
+}
+
+func (p *Parser) readSize() (int, error) {
 	str := strings.Builder{}
 	for p.current() != '\r' {
 		str.WriteByte(p.current())
-		p.advanceWithoutSkippingCRLF()
+		p.movePointers()
 	}
 
 	length, err := strconv.Atoi(str.String())
@@ -159,18 +186,30 @@ func (p *Parser) current() byte {
 	return p.input[p.currentPosition]
 }
 
-func (p *Parser) advanceWithoutSkippingCRLF() {
+func (p *Parser) movePointers() {
 	p.currentPosition = p.peekPosition
 	p.peekPosition++
 }
 
 func (p *Parser) advance() {
-	p.currentPosition = p.peekPosition
-	p.peekPosition++
+	p.movePointers()
 
+	p.skipArrays()
+	p.skipCRLF()
+}
+
+// I'm skipping arrays because I don't know how to parse them yet
+func (p *Parser) skipArrays() {
+	if p.current() == '*' {
+		for p.current() != '\r' {
+			p.movePointers()
+		}
+	}
+}
+
+func (p *Parser) skipCRLF() {
 	for p.current() == '\r' || p.current() == '\n' {
-		p.currentPosition = p.peekPosition
-		p.peekPosition++
+		p.movePointers()
 	}
 }
 

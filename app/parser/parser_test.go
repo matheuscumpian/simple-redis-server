@@ -31,7 +31,7 @@ func TestParser_Parse(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ping",
+			name: "ping with argument",
 			fields: fields{
 				input: "*1\r\n$4\r\nping\r\n$12\r\nhello world\r\n",
 			},
@@ -42,6 +42,18 @@ func TestParser_Parse(t *testing.T) {
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "echo",
+			fields: fields{
+				input: "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n",
+			},
+			want: []Command{
+				Echo{
+					Literal:  "ECHO",
+					Response: "hey\r\n",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
