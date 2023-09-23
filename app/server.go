@@ -8,6 +8,11 @@ import (
 	"sync"
 )
 
+var (
+	storage = map[string][]byte{}
+	mutex   = sync.RWMutex{}
+)
+
 type Message struct {
 	from    string
 	payload []byte
@@ -21,6 +26,8 @@ type Server struct {
 	quitChan      chan struct{}
 	msgChan       chan Message
 	peerMap       map[string]net.Conn
+
+	storage map[string][]byte
 }
 
 func NewServer(listenAddress string) *Server {
@@ -139,6 +146,23 @@ func handlePayload(payload []byte) [][]byte {
 		if cmd == nil {
 			responses = append(responses, []byte("-ERR invalid command\r\n"))
 			continue
+		}
+
+		if cmd.Type() == parser.SetCommand {
+			setCmd := cmd.(parser.Set)
+			mutex.Lock()
+			storage[setCmd.Key] = []byte(setCmd.Value)
+			mutex.Unlock()
+		}
+
+		if cmd.Type() == parser.GetCommand {
+			getCmd := cmd.(*parser.Get)
+			mutex.RLock()
+			value, ok := storage[getCmd.Key]
+			mutex.RUnlock()
+			if ok {
+				getCmd.SetValue(string(value))
+			}
 		}
 
 		response := cmd.Respond()

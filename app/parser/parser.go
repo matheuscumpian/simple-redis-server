@@ -7,8 +7,15 @@ import (
 	"strings"
 )
 
+const (
+	PingCommand = "PING"
+	EchoCommand = "ECHO"
+	SetCommand  = "SET"
+	GetCommand  = "GET"
+)
+
 type Command interface {
-	String() string
+	Type() string
 	Respond() string
 }
 
@@ -18,8 +25,8 @@ type Ping struct {
 	Response string
 }
 
-func (p Ping) String() string {
-	return "PING"
+func (p Ping) Type() string {
+	return PingCommand
 }
 
 func (p Ping) Respond() string {
@@ -38,8 +45,8 @@ type Echo struct {
 	Response string
 }
 
-func (e Echo) String() string {
-	return "ECHO"
+func (e Echo) Type() string {
+	return EchoCommand
 }
 
 func (e Echo) Respond() string {
@@ -50,6 +57,52 @@ func (e Echo) Respond() string {
 	str.WriteString(e.Response)
 	str.WriteString("\r\n")
 	return str.String()
+}
+
+// Set command
+type Set struct {
+	Literal string
+
+	Key   string
+	Value string
+}
+
+func (s Set) Type() string {
+	return SetCommand
+}
+
+func (s Set) Respond() string {
+	return "+OK\r\n"
+}
+
+// Get command
+type Get struct {
+	Literal string
+
+	Key   string
+	Value string
+}
+
+func (g *Get) Type() string {
+	return GetCommand
+}
+
+func (g *Get) SetValue(value string) {
+	g.Value = value
+}
+
+func (g *Get) Respond() string {
+	if g.Value != "" {
+		str := strings.Builder{}
+		str.WriteString("$")
+		str.WriteString(strconv.Itoa(len(g.Value)))
+		str.WriteString("\r\n")
+		str.WriteString(g.Value)
+		str.WriteString("\r\n")
+		return str.String()
+	}
+
+	return "$-1\r\n"
 }
 
 type Parser struct {
@@ -84,9 +137,59 @@ func (p *Parser) getCommand(str string) (Command, error) {
 		return p.parsePing(str)
 	case "echo":
 		return p.parseEcho(str)
+	case "set":
+		return p.parseSet(str)
+	case "get":
+		return p.parseGet(str)
 	}
 
 	return nil, nil
+}
+
+func (p *Parser) parseSet(str string) (Command, error) {
+	cmd := Set{
+		Literal: str,
+	}
+
+	// Get key
+	if p.current() == '$' {
+		str, err := p.parseBulkString()
+		if err != nil {
+			return nil, err
+		}
+
+		cmd.Key = str
+	}
+
+	// Get value
+	if p.current() == '$' {
+		str, err := p.parseBulkString()
+		if err != nil {
+			return nil, err
+		}
+
+		cmd.Value = str
+	}
+
+	return cmd, nil
+}
+
+func (p *Parser) parseGet(str string) (Command, error) {
+	cmd := &Get{
+		Literal: str,
+	}
+
+	// Get key
+	if p.current() == '$' {
+		str, err := p.parseBulkString()
+		if err != nil {
+			return nil, err
+		}
+
+		cmd.Key = str
+	}
+
+	return cmd, nil
 }
 
 func (p *Parser) parseEcho(str string) (Command, error) {
