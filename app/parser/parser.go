@@ -188,7 +188,7 @@ func (p *Parser) parseSet(str string) (Command, error) {
 			return nil, err
 		}
 
-		if str != "PX" {
+		if strings.ToLower(str) != "px" {
 			return nil, fmt.Errorf("invalid expiry, received $%s, expeced $PX", str)
 		}
 
