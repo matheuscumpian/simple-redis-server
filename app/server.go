@@ -6,6 +6,7 @@ import (
 	"os"
 	"redis/app/parser"
 	"sync"
+	"time"
 )
 
 var (
@@ -149,10 +150,19 @@ func handlePayload(payload []byte) [][]byte {
 		}
 
 		if cmd.Type() == parser.SetCommand {
-			setCmd := cmd.(parser.Set)
+			setCmd := cmd.(*parser.Set)
 			mutex.Lock()
 			storage[setCmd.Key] = []byte(setCmd.Value)
 			mutex.Unlock()
+
+			if setCmd.Expire != nil {
+				ttl := time.Duration(*setCmd.Expire) * time.Millisecond
+				time.AfterFunc(ttl, func() {
+					mutex.Lock()
+					delete(storage, setCmd.Key)
+					mutex.Unlock()
+				})
+			}
 		}
 
 		if cmd.Type() == parser.GetCommand {

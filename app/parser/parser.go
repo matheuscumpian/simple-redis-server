@@ -65,13 +65,20 @@ type Set struct {
 
 	Key   string
 	Value string
+
+	Expire *int
 }
 
-func (s Set) Type() string {
+func (s *Set) SetExpiry(expiry int) {
+	px := expiry
+	s.Expire = &px
+}
+
+func (s *Set) Type() string {
 	return SetCommand
 }
 
-func (s Set) Respond() string {
+func (s *Set) Respond() string {
 	return "+OK\r\n"
 }
 
@@ -147,7 +154,7 @@ func (p *Parser) getCommand(str string) (Command, error) {
 }
 
 func (p *Parser) parseSet(str string) (Command, error) {
-	cmd := Set{
+	cmd := &Set{
 		Literal: str,
 	}
 
@@ -169,6 +176,33 @@ func (p *Parser) parseSet(str string) (Command, error) {
 		}
 
 		cmd.Value = str
+	}
+
+	// Get expiry
+
+	// Look for PX string
+
+	if p.current() == '$' {
+		str, err := p.parseBulkString()
+		if err != nil {
+			return nil, err
+		}
+
+		if str != "PX" {
+			return nil, fmt.Errorf("invalid expiry, received $%s, expeced $PX", str)
+		}
+
+		str, err = p.parseBulkString()
+		if err != nil {
+			return nil, err
+		}
+
+		expiry, err := strconv.Atoi(str)
+		if err != nil {
+			return nil, fmt.Errorf("invalid expiry, received $%s, expeced $INTEGER", str)
+		}
+
+		cmd.SetExpiry(expiry)
 	}
 
 	return cmd, nil
