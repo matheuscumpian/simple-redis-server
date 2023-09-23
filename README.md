@@ -1,34 +1,19 @@
-[![progress-banner](https://backend.codecrafters.io/progress/redis/83454c71-6bc5-4bd2-89b2-598100a64e97)](https://app.codecrafters.io/users/HeavyBR?r=2qF)
+# 🚀 My Simple Redis Server in Go 🚀
 
-This is a starting point for Go solutions to the
-["Build Your Own Redis" Challenge](https://codecrafters.io/challenges/redis).
+Explore this educational implementation of a Redis server in Go, crafted as part of the [CodeCrafters Redis Challenge](https://codecrafters.io/challenges/redis). 📚💻
 
-In this challenge, you'll build a toy Redis clone that's capable of handling
-basic commands like `PING`, `SET` and `GET`. Along the way we'll learn about
-event loops, the Redis protocol and more.
+## ✨ Features ✨
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+This project offers a minimalistic yet functional Redis server with the following commands:
 
-# Passing the first stage
+- 🏓 `Ping`: Confirm the server is operational
+- 🔊 `Echo`: Echo back a given message
+- 💾 `Set`: Save a key-value pair
+- 📖 `Get`: Fetch the value corresponding to a specified key
 
-The entry point for your Redis implementation is in `app/server.go`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+## 🤩 Why Check Out This Project? 🤩
 
-```sh
-git add .
-git commit -m "pass 1st stage" # any msg
-git push origin master
-```
+If you've ever been interested in database internals or wanted a closer look at how Redis operates, then this is a project you'll want to explore. It serves as a hands-on way to grasp the basics of database technology. 🛠️🎓
 
-That's all!
-
-# Stage 2 & beyond
-
-Note: This section is for stages 2 and beyond.
-
-1. Ensure you have `go (1.19)` installed locally
-1. Run `./spawn_redis_server.sh` to run your Redis server, which is implemented
-   in `app/server.go`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+Feel free to dive in and see what a simplified Redis server, implemented in Go, looks like! 🎉👩‍💻👨‍💻
+e parser is very simple, but it works.
